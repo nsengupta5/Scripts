@@ -26,11 +26,11 @@ def main():
         driver.quit()
 
     search = driver.find_element(By.NAME, "Search")
-    search.send_keys("The Mandalorian")
+    search.send_keys("The Grudge")
     search.send_keys(Keys.RETURN)
 
     try:
-        movie = WebDriverWait(driver, 10).until(
+        movie = WebDriverWait(driver, 40).until(
             EC.presence_of_all_elements_located((By.CLASS_NAME, "MediumMovie"))
         )
 
@@ -41,14 +41,28 @@ def main():
             title = movie.find_element(By.CLASS_NAME, "title")
 
             # TODO - Add logic to select the correct movie from user input
-            if title.text == "Disney Gallery: Star Wars: The Mandalorian (Documentary-2023)":
+            if title.text == "The Grudge (2004)":
                 movie_middle = movie.find_element(By.CLASS_NAME, "middle")
                 movie_middle.click()
                 break
-            print(title.text)
+
+        try:
+            download_button = WebDriverWait(driver, 40).until(
+                EC.presence_of_element_located((By.ID, "btnDownload"))
+            )
+            download_button.click()
+
+            download_parent = driver.find_element(By.ID, "downloadDropdown")
+            download_options = download_parent.find_elements(By.TAG_NAME, "a")
+            for option in download_options:
+                title_option = option.get_attribute("title")
+                print(title_option)
+                
+        except Exception as e:
+            print(f"Download Error: {e}")
 
     except Exception as e:
-        print(e)
+        print(f"Other Error: {e}")
 
 def connect_to_vpn():
     # Connect to Proton VPN
