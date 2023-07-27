@@ -13,7 +13,7 @@ def main():
     driver = get_driver()
     driver.get("https://watchsomuch.to/")
     close_popup(driver)
-    search_movie(driver)
+    movie = search_movie(driver)
 
     try:
         movies = get_movie_list(driver)
@@ -33,6 +33,8 @@ def main():
         print(f"Other Error: {e}")
 
     # disconnect_from_vpn()
+    driver.get("https://subscene.com/")
+    search_sub(driver, movie)
     print("Done")
 
 def connect_to_vpn():
@@ -67,7 +69,13 @@ def get_url_safe_title(title):
     title_arr = title.split(" ")
     if "-" in title_arr:
         title_arr.remove("-")
-    return ".".join(title_arr[:-1])
+
+    cleaned_words = []
+
+    for word in title_arr:
+        cleaned_word = word.replace("(", "").replace(")", "").replace(":", "")
+        cleaned_words.append(cleaned_word)
+    return ".".join(cleaned_words[:-1])
 
 def download_movie(url, title):
     print("Downloading movie...")
@@ -172,6 +180,12 @@ def choose_download(download_options, download_choice):
             option.click()
             break
     return download_choice
+
+def search_sub(driver, movie_title):
+    print("Searching for subtitles...")
+    search = driver.find_element(By.ID, "query")
+    search.send_keys(movie_title)
+    search.send_keys(Keys.RETURN)
 
 if __name__ == "__main__":
     main()
