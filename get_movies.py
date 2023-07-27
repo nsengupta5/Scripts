@@ -5,17 +5,99 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+MOVIE_DIR = "/home/nsengupta5/Videos/Movies/"
+SUBTITLE_DIR = "/home/nsengupta5/Videos/Movies/subtitles/"
+
 def main():
-    # Connect to Proton VPN
-    # print("Connecting to Proton VPN")
-    # _, error = connect_to_vpn()
-    # if error:
-    #     exit(1)
-
-    # Get movies
-    driver = webdriver.Firefox()
+    # connect_to_vpn()
+    driver = get_driver()
     driver.get("https://watchsomuch.to/")
+    close_popup(driver)
+    search_movie(driver)
 
+    try:
+        movies = get_movie_list(driver)
+        movie_choice = get_movie_choice(movies)
+        choose_movie(movies, movie_choice)
+
+        try:
+            download_options = get_download_list(driver)
+            download_choice = get_download_choice(download_options)
+            movie_title = choose_download(download_options, download_choice)
+            download_movie(driver.current_url, movie_title)
+
+        except Exception as e:
+            print(f"Download Parent Error: {e}")
+
+    except Exception as e:
+        print(f"Other Error: {e}")
+
+    # disconnect_from_vpn()
+    print("Done")
+
+def connect_to_vpn():
+    print("Connecting to Proton VPN...")
+    command = ["protonvpn-cli", "c", "-f"]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+
+    output, error = process.communicate()
+    if error:
+        print(error.decode("utf-8"))
+        exit(1)
+    print(output.decode("utf-8"))
+
+def disconnect_from_vpn():
+    print("Disconnecting from Proton VPN...")
+    command = ["protonvpn-cli", "d"]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+
+    output, error = process.communicate()
+    if error:
+        print(error.decode("utf-8"))
+        exit(1)
+    print(output.decode("utf-8"))
+
+def get_movie_id(url):
+    # Get movie id from url
+    download_part = url.split("/")[-2]
+    return download_part.split("-")[-1]
+
+def get_url_safe_title(title):
+    # Get url safe title
+    title_arr = title.split(" ")
+    if "-" in title_arr:
+        title_arr.remove("-")
+    return ".".join(title_arr[:-1])
+
+def download_movie(url, title):
+    print("Downloading movie...")
+
+    # Get movie url
+    movie_id = get_movie_id(url)
+    url_safe_title = get_url_safe_title(title)
+
+    download_link = "https://media.watchsomuch.com/Torrents/" + url_safe_title + "." + movie_id + ".WatchSoMiuch.torrent"
+
+    print (f"Download Link: {download_link}")
+
+    # Download movie
+    command = ["curl", download_link, "-o", MOVIE_DIR + title + ".torrent"]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+
+    output, error = process.communicate()
+    if error:
+        print(error.decode("utf-8"))
+        exit(1)
+    print(output.decode("utf-8"))
+
+def get_driver():
+    print("Getting driver...")
+    options = webdriver.FirefoxOptions()
+    options.add_argument("--headless")
+    return webdriver.Firefox(options=options)
+
+def close_popup(driver):
+    print("Closing popup...")
     try:
         close_button_xpath = '//*[@id="UpgradePlans"]/div/div[1]/button[1]'
         close_button = WebDriverWait(driver, 10).until(
@@ -25,58 +107,71 @@ def main():
     except:
         driver.quit()
 
+def search_movie(driver):
+    title = input("Enter movie title: ")
+    print(f"Searching for {title}...")
     search = driver.find_element(By.NAME, "Search")
-    search.send_keys("The Grudge")
+    search.send_keys(title)
     search.send_keys(Keys.RETURN)
 
-    try:
-        movie = WebDriverWait(driver, 40).until(
-            EC.presence_of_all_elements_located((By.CLASS_NAME, "MediumMovie"))
-        )
+def get_movie_list(driver):
+    print("Getting movie list...")
+    WebDriverWait(driver, 40).until(
+        EC.presence_of_all_elements_located((By.CLASS_NAME, "MediumMovie"))
+    )
 
-        content = driver.find_element(By.ID, "Content")
+    content = driver.find_element(By.ID, "Content")
+    return content.find_elements(By.CLASS_NAME, "MediumMovie")
 
-        movies = content.find_elements(By.CLASS_NAME, "MediumMovie")
-        for movie in movies:
-            title = movie.find_element(By.CLASS_NAME, "title")
+def get_movie_choice(movie_list):
+    print("Getting movie choice...\n")
 
-            # TODO - Add logic to select the correct movie from user input
-            if title.text == "The Grudge (2004)":
-                movie_middle = movie.find_element(By.CLASS_NAME, "middle")
-                movie_middle.click()
-                break
+    for i, movie in enumerate(movie_list):
+        title = movie.find_element(By.CLASS_NAME, "title")
+        print(f"({i + 1}) {title.text}")
 
-        try:
-            download_button = WebDriverWait(driver, 40).until(
-                EC.presence_of_element_located((By.ID, "btnDownload"))
-            )
-            download_button.click()
+    print()
+    movie_choice = input("Enter movie number: ")
+    return movie_list[int(movie_choice) - 1].find_element(By.CLASS_NAME, "title").text
 
-            download_parent = driver.find_element(By.ID, "downloadDropdown")
-            download_options = download_parent.find_elements(By.TAG_NAME, "a")
-            for option in download_options:
-                title_option = option.get_attribute("title")
-                print(title_option)
-                
-        except Exception as e:
-            print(f"Download Error: {e}")
+def choose_movie(movies, movie_choice):
+    print(f"Choosing {movie_choice}...")
+    for movie in movies:
+        title = movie.find_element(By.CLASS_NAME, "title")
+        if title.text == movie_choice:
+            movie_middle = movie.find_element(By.CLASS_NAME, "middle")
+            movie_middle.click()
+            break
 
-    except Exception as e:
-        print(f"Other Error: {e}")
+def get_download_list(driver):
+    print("Getting download list...")
+    download_button = WebDriverWait(driver, 40).until(
+        EC.presence_of_element_located((By.ID, "btnDownload"))
+    )
+    download_button.click()
 
-def connect_to_vpn():
-    # Connect to Proton VPN
-    command = ["protonvpn-cli", "c", "-f"]
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+    download_parent = driver.find_element(By.ID, "downloadDropdown")
+    return download_parent.find_elements(By.TAG_NAME, "a")
 
-    output, error = process.communicate()
-    if error:
-        print(error.decode("utf-8"))
-        return error
-    print(output.decode("utf-8"))
+def get_download_choice(download_options):
+    print("Getting download choice...\n")
 
-    return output, error
+    for i, option in enumerate(download_options):
+        title = option.get_attribute("title")
+        print(f"({i + 1}) {title}")
+
+    print()
+    download_choice = input("Enter download number: ")
+    return download_options[int(download_choice) - 1].get_attribute("title")
+
+def choose_download(download_options, download_choice):
+    print(f"Choosing {download_choice}...")
+    for option in download_options:
+        title = option.get_attribute("title")
+        if title == download_choice:
+            option.click()
+            break
+    return download_choice
 
 if __name__ == "__main__":
     main()
-
